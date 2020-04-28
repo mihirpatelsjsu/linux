@@ -62,7 +62,7 @@ u64 kvm_supported_xcr0(void)
 	return xcr0;
 }
 
-#define F feature_bit
+#define F(x) bit(X86_FEATURE_##x)
 
 int kvm_update_cpuid(struct kvm_vcpu *vcpu)
 {
@@ -281,9 +281,8 @@ out:
 	return r;
 }
 
-static __always_inline void cpuid_mask(u32 *word, int wordnum)
+static void cpuid_mask(u32 *word, int wordnum)
 {
-	reverse_cpuid_check(wordnum);
 	*word &= boot_cpu_data.x86_capability[wordnum];
 }
 
@@ -1056,7 +1055,7 @@ EXPORT_SYMBOL_GPL(kvm_cpuid);
 
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
-	u32 eax, ebx, ecx, edx;
+/*	u32 eax, ebx, ecx, edx;
 
 	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
 		return 1;
@@ -1069,5 +1068,54 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 	kvm_rcx_write(vcpu, ecx);
 	kvm_rdx_write(vcpu, edx);
 	return kvm_skip_emulated_instruction(vcpu);
+*/
+	u32 eax, ebx, ecx, edx;
+	// if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
+	// 	return 1;
+
+	eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
+	
+    if(eax == 0x4FFFFFFF)
+	{
+		
+		u32 exits = vcpu->cmpe283_data.total_exits;
+		eax = exits;
+        ecx = kvm_register_read(vcpu, VCPU_REGS_RCX);
+		printk(KERN_INFO "exits: %u", vcpu->cmpe283_data.total_exits);
+		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
+		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
+		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
+		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+	}
+    else if (eax == 0x4FFFFFFE)
+    {	// eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
+        ebx = (u32)((vcpu->cmpe283_data.total_cycles & 0xFFFFFFFF00000000LL) >> 32);
+		ecx = (u32)(vcpu->cmpe283_data.total_cycles & 0xFFFFFFFFLL);
+		printk(KERN_INFO "total time in vmm: %llu", vcpu->cmpe283_data.total_cycles);
+		
+		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
+		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
+		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
+		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+		
+    }
+
+    else{
+
+		// eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
+		ecx = kvm_register_read(vcpu, VCPU_REGS_RCX);
+		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
+		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
+		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
+		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+		
+	}
+
+	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
+	 	return 1;
+ 	return kvm_skip_emulated_instruction(vcpu);
+
 }
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
