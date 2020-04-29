@@ -1053,43 +1053,27 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
 }
 EXPORT_SYMBOL_GPL(kvm_cpuid);
 
+//update start
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
-/*	u32 eax, ebx, ecx, edx;
-
-	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
-		return 1;
-
-	eax = kvm_rax_read(vcpu);
-	ecx = kvm_rcx_read(vcpu);
-	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
-	kvm_rax_write(vcpu, eax);
-	kvm_rbx_write(vcpu, ebx);
-	kvm_rcx_write(vcpu, ecx);
-	kvm_rdx_write(vcpu, edx);
-	return kvm_skip_emulated_instruction(vcpu);
-*/
 	u32 eax, ebx, ecx, edx;
-	// if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
-	// 	return 1;
 
 	eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
-	
+	ecx = kvm_register_read(vcpu, VCPU_REGS_RCX);
     if(eax == 0x4FFFFFFF)
 	{
 		
-		u32 exits = vcpu->cmpe283_data.total_exits;
-		eax = exits;
-        ecx = kvm_register_read(vcpu, VCPU_REGS_RCX);
-		printk(KERN_INFO "exits: %u", vcpu->cmpe283_data.total_exits);
+		eax = vcpu->cmpe283_data.total_exits;
+        	printk(KERN_INFO "exits: %u", vcpu->cmpe283_data.total_exits);
 		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
 		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
 		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
 		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+		
 	}
     else if (eax == 0x4FFFFFFE)
-    {	// eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
-        ebx = (u32)((vcpu->cmpe283_data.total_cycles & 0xFFFFFFFF00000000LL) >> 32);
+    {	
+		ebx = (u32)((vcpu->cmpe283_data.total_cycles & 0xFFFFFFFF00000000LL) >> 32);
 		ecx = (u32)(vcpu->cmpe283_data.total_cycles & 0xFFFFFFFFLL);
 		printk(KERN_INFO "total time in vmm: %llu", vcpu->cmpe283_data.total_cycles);
 		
@@ -1100,22 +1084,89 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
 		
     }
-
-    else{
-
-		// eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
+	else if (eax == 0x4FFFFFFD)
+    {	
+		if(ecx < 0 || ecx > 68 || ecx == 35 || ecx == 38 || ecx == 42 || ecx == 65  ){
+			kvm_register_write(vcpu, VCPU_REGS_RAX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RBX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RCX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RDX, 0x4FFFFFFF);
+	
+		} 
+		else if(ecx == 3 || ecx == 4 || ecx == 5 || ecx == 6  || ecx == 11  || ecx == 16  || ecx == 17  || ecx == 33  || ecx == 34  || ecx == 51 || ecx == 66  ){
+			kvm_register_write(vcpu, VCPU_REGS_RAX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RBX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RCX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RDX, 0);
+		
+		}
+		else{	
 		ecx = kvm_register_read(vcpu, VCPU_REGS_RCX);
+		int reason = (int)ecx;
+		eax = vcpu->cmpe283_data.exits_per_reason[reason];
+		printk(KERN_INFO "exits per reason %d: %llu", reason,vcpu->cmpe283_data.exits_per_reason[reason]);
+		
 		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
 		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
 		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
 		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
 		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+	
+		}
 		
+    }
+	else if (eax == 0x4FFFFFFC)
+    {	
+		if(ecx < 0 || ecx > 68 || ecx == 35 || ecx == 38 || ecx == 42 || ecx == 65  ){
+			kvm_register_write(vcpu, VCPU_REGS_RAX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RBX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RCX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RDX, 0x4FFFFFFF);
+	
+		} 
+		else if(ecx == 3 || ecx == 4 || ecx == 5 || ecx == 6  || ecx == 11  || ecx == 16  || ecx == 17  || ecx == 33  || ecx == 34  || ecx == 51 || ecx == 66  ){
+			kvm_register_write(vcpu, VCPU_REGS_RAX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RBX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RCX, 0);
+			kvm_register_write(vcpu, VCPU_REGS_RDX, 0);
+		
+		}
+		else{
+		
+			int reason = (int)ecx;
+			u64 per_reason = vcpu->cmpe283_data.cycles_per_reason[reason];
+			ebx = (u32)((per_reason & 0xFFFFFFFF00000000LL) >> 32);
+			ecx = (u32)(per_reason & 0xFFFFFFFFLL);
+			printk(KERN_INFO "total time per reason  %d in vmm: %llu", reason,per_reason);
+			
+			kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+			kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
+			kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
+			kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
+			kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+	
+		}
+		
+    }
+
+    else{
+
+		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
+		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
+		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
+		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
+	
 	}
+	
+	
 
 	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
 	 	return 1;
  	return kvm_skip_emulated_instruction(vcpu);
 
 }
+
+
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
+//update end

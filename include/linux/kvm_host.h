@@ -307,7 +307,10 @@ struct kvm_vcpu {
 //update start
 	struct {
 		u32 total_exits;
+		u32 exits_per_reason[69];
 		u64 total_cycles;
+		u64 cycles_per_reason[69];
+
 	} cmpe283_data;
 //update end
 

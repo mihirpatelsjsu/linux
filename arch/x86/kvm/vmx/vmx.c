@@ -65,6 +65,7 @@ MODULE_AUTHOR("Qumranet");
 MODULE_LICENSE("GPL");
 //update start
 u32 exit_count = 0;
+u32 exit_count_per_reason = 0;
 //update end
 static const struct x86_cpu_id vmx_cpu_id[] = {
 	X86_FEATURE_MATCH(X86_FEATURE_VMX),
@@ -5837,11 +5838,13 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	//update start
 	u64 start_time = 0;
 	u64 end_time = 0;
-	exit_count = vcpu->cmpe283_data.total_exits;
-	exit_count++;
-	vcpu->cmpe283_data.total_exits = exit_count;
+	// exit_count = vcpu->cmpe283_data.total_exits;
+	// exit_count_per_reason = vcpu->cmpe283_data.exits_per_reason;
+	// exit_count++;
+	vcpu->cmpe283_data.total_exits += 1;
+	vcpu->cmpe283_data.exits_per_reason[exit_reason] += 1;
 	
-    	start_time = rdtsc();
+    start_time = rdtsc();
 	//update end
 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
 
@@ -5858,10 +5861,11 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	/* If guest state is invalid, start emulating */
 //update start	
 	if (vmx->emulation_required){
-		int ret = handle_invalid_guest_state(vcpu);
+		int retVal = handle_invalid_guest_state(vcpu);
 		end_time = rdtsc();
-		vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
-		return ret;
+		vcpu->cmpe283_data.total_cycles += end_time - start_time;
+		vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
+		return retVal;
 	
 	}
 		//return handle_invalid_guest_state(vcpu);
@@ -5870,24 +5874,26 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 //update start
 	if (is_guest_mode(vcpu) && nested_vmx_exit_reflected(vcpu, exit_reason))
 	{
-	    int ret  = nested_vmx_reflect_vmexit(vcpu, exit_reason);
+	    int retVal  = nested_vmx_reflect_vmexit(vcpu, exit_reason);
 	    end_time = rdtsc();
-	    vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
-	    return ret;
+	    vcpu->cmpe283_data.total_cycles += end_time - start_time;
+	    vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
+	    return retVal;
 	}		
 	//return nested_vmx_reflect_vmexit(vcpu, exit_reason);
 //update end
-	
-//update start
+//update start	
 	if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
 		dump_vmcs();
 		vcpu->run->exit_reason = KVM_EXIT_FAIL_ENTRY;
 		vcpu->run->fail_entry.hardware_entry_failure_reason
 			= exit_reason;
 		end_time = rdtsc();
-		vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
+	        vcpu->cmpe283_data.total_cycles += end_time - start_time;
+	        vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
 		return 0;
 	}
+
 //update end
 //update start
 	if (unlikely(vmx->fail)) {
@@ -5896,10 +5902,12 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		vcpu->run->fail_entry.hardware_entry_failure_reason
 			= vmcs_read32(VM_INSTRUCTION_ERROR);
 		end_time = rdtsc();
-		vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
+	        vcpu->cmpe283_data.total_cycles += end_time - start_time;
+	        vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
+		
 		return 0;
 	}
-//updaye end
+//update end
 	/*
 	 * Note:
 	 * Do not try to fix EXIT_REASON_EPT_MISCONFIG if it caused by
@@ -5926,8 +5934,9 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		
 		}
 		end_time = rdtsc();
-		vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
-		
+	        vcpu->cmpe283_data.total_cycles += end_time - start_time;
+	        vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
+
 		return 0;
 	}
 //update end
@@ -5973,12 +5982,14 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	if (!kvm_vmx_exit_handlers[exit_reason])
 		goto unexpected_vmexit;
 	//update start
-	int ret = kvm_vmx_exit_handlers[exit_reason](vcpu); 
+	int retVal = kvm_vmx_exit_handlers[exit_reason](vcpu); 
 	end_time = rdtsc();
-	vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
-	return ret;
+	vcpu->cmpe283_data.total_cycles += end_time - start_time;
+	vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
+	return retVal;
 	//return kvm_vmx_exit_handlers[exit_reason](vcpu);
 
+//update start
 unexpected_vmexit:
 	vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n", exit_reason);
 	dump_vmcs();
@@ -5987,13 +5998,13 @@ unexpected_vmexit:
 			KVM_INTERNAL_ERROR_UNEXPECTED_EXIT_REASON;
 	vcpu->run->internal.ndata = 1;
 	vcpu->run->internal.data[0] = exit_reason;
-	//update start
-    end_time = rdtsc();
-	vcpu->cmpe283_data.total_cycles = vcpu->cmpe283_data.total_cycles + end_time - start_time;
-	//update end
+		end_time = rdtsc();
+	        vcpu->cmpe283_data.total_cycles += end_time - start_time;
+	        vcpu->cmpe283_data.cycles_per_reason[exit_reason] += end_time - start_time;
+
 	return 0;
 }
-
+//update end
 /*
  * Software based L1D cache flush which is used when microcode providing
  * the cache control MSR is not loaded.
